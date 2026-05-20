@@ -1,0 +1,108 @@
+
+### model
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Meta-Llama-3-8B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Qwen2.5-7B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Llama-2-13b-chat-hf
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Llama-3.2-3B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Llama-3.1-8B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Qwen2.5-Math-7B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/DeepSeek-R1-Distill-Qwen-7B
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Qwen3-14B
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/phi-4
+model_name_or_path: /hujinwu/pre-models/Meta-Llama-3.1-8B-Instructls
+# model_name_or_path: /hujinwu/pre-models/Qwen2.5-14B-Instruct
+
+### method
+stage: sft
+do_train: true
+do_predict: true
+finetuning_type: lora
+lora_target: q_proj,v_proj
+# lora_target: qkv_proj
+
+# seed: 31415926
+# full_determinism: true  # 确保完全可复现
+
+trust_remote_code: true
+setting: DFG_GT_fast  # online_tent, use_forking_tokens, online_adaptive_k, online_eata, online_ttl,dynamic_future_gain,future_gain,uncertainty_gain
+# only_last_token: true   # 使用第new_token进行更新
+# entropy_type: dirichlet_entropy     # dirichlet_entropy (from COME paper), naive_entropy (from Tent paper)
+new_tokens: -1
+## 
+initial_delta: 0.02
+threshold_low: 0.02
+patient_m: 2
+prevh_coef: 0.3  # 用于计算 d_i < prev_h * self.prevh_coef
+kl_loss_coef: 0.0 # 0.1   # kl loss 一般很小，所以这里的系数设的稍微大了些
+
+# online eata / online ttl 都需要一个阈值
+threshold: 0.4
+
+entropy_type: temperature_scaled_entropy  # adaptive_entropy, entropy_detach, collapse_reg_entropy, collapse_reg_entropy_v2, SAFE_Entropy_loss, SAFE_Entropy_loss_v2, SAFE_Entropy_loss_detach, SAFE_Entropy_loss_detach_v2,temperature_scaled_entropy
+
+### dataset
+dataset: &dataset minerva_formatted  # gsm8k_test_formatted, gsm8k_test_add_suffix, 
+# math_500, college_math_formatted, aime24_formatted, 
+# aime25_formatted, minerva_formatted, olympiad_formatted
+# agriculture_5k  gen_med_gpt_5k  geosignal_5k  wealth_5k
+
+eval_dataset: *dataset
+# template: llama2
+# template: qwen
+template: llama3
+# template: qwen3
+# template: phi4
+cutoff_len: 1024
+max_samples: 41000
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+
+gain_softmax_temp: 1.2
+temperature_alpha: 0.5
+top_p_2: 0.2
+entropy_threshold: 1.0e-4
+
+output_dir: saves/rebuttal/decode/Llama-3.1-8B/DFG_GT/m_6-gamma_1-p_0.2-max_10-min_2/gst_1.2-alpha_0.5/minerva_formatted/5.0e-6
+# output_dir: saves/rebuttal/sensitive/Llama-3.1-8B/DFG_GT/m_6-gamma_1-p_0.2-max_10-min_2/gst_1.2-alpha_1.0/math_500/5.0e-6
+# output_dir: saves/output2/Llama-3.1-8B/entropy_bottom20/gsm8k_test_formatted/1.0e-5
+
+learning_rate: 5.0e-6
+
+logging_steps: 10
+# save_steps: 4000
+save_strategy: "no"
+plot_loss: true
+overwrite_output_dir: false
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 1
+
+
+num_train_epochs: 1.0
+# num_train_epochs: 2.0
+lr_scheduler_type: constant
+warmup_ratio: 0.0
+bf16: true
+ddp_timeout: 180000000
+
+
+### eval
+do_eval: null
+
+### predict
+# temperature: 0.6
+
+temperature: 0.0
+
+
+do_sample: false
+
+max_new_tokens: 8192  # 之前是1024，现在统一设成8192
+per_device_eval_batch_size: 1
+predict_with_generate: true
+
+# report_to: tensorboard
+# logging_dir: tensorboard/runs-0327
+report_to: none

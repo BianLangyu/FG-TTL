@@ -1,0 +1,41 @@
+# The batch generation can be SLOW using this config.
+# For faster inference, we recommend to use `scripts/vllm_infer.py`.
+
+### model
+model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/models--Qwen--Qwen2.5-VL-3B-Instruct
+model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/1b989f2c63999d7344135894d3cfa8f494116743
+image_max_pixels: 262144
+video_max_pixels: 16384
+trust_remote_code: true
+
+# full_determinism: true
+
+### method
+stage: sft
+do_predict: true
+finetuning_type: lora
+
+### dataset            geosignal_5k, agriculture_5k, gen_med_gpt_5k, wealth_5k
+eval_dataset: math_vision # gsm8k_test_formatted, math_500, mawps_formatted, college_math_formatted, aime24_formatted, aime25_formatted  / gsm8k_test_add_suffix, minerva_formatted
+template: qwen2_vl
+cutoff_len: 2048
+max_samples: 41000
+overwrite_cache: true
+preprocessing_num_workers: 16
+dataloader_num_workers: 4
+
+### output
+output_dir: saves/AAAI26/Qwen2.5-VL-3B-Instruct/base_model_results-hf/math_vision
+overwrite_output_dir: true
+report_to: none  # choices: [none, wandb, tensorboard, swanlab, mlflow]
+
+### eval
+per_device_eval_batch_size: 1
+predict_with_generate: true
+ddp_timeout: 180000000
+
+
+temperature: 0.0
+do_sample: false
+max_new_tokens: 8192  # 之前是1024，现在统一设成8192
+# max_new_tokens: 512  # 之前是1024，现在统一设成8192

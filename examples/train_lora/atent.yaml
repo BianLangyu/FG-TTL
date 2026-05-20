@@ -1,0 +1,103 @@
+
+### model
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Meta-Llama-3-8B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Qwen2.5-7B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Llama-2-13b-chat-hf
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Llama-3.2-3B-Instruct
+model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Llama-3.1-8B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Qwen2.5-Math-7B-Instruct
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/DeepSeek-R1-Distill-Qwen-7B
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/Qwen3-14B
+# model_name_or_path: /hujinwu/LLM_Assemble/pretrain_model/phi-4
+
+
+### method
+stage: sft
+do_train: true
+do_predict: true
+finetuning_type: lora
+lora_target: q_proj,v_proj
+# lora_target: qkv_proj
+# seed: 44
+# full_determinism: true  # 确保完全可复现
+
+trust_remote_code: true
+setting: atent  # , use_forking_tokens, online_adaptive_k, online_eata, online_ttl
+# only_last_token: true   # 使用第new_token进行更新
+# entropy_type: dirichlet_entropy     # dirichlet_entropy (from COME paper), naive_entropy (from Tent paper)
+new_tokens: 8
+
+add_predictor: true
+# predictor_learning_rate: 7.5e-6
+
+
+# online eata / online ttl 都需要一个阈值
+threshold: 3
+
+# entropy_type: SAFE_Entropy_loss_detach_v2  # adaptive_entropy, entropy_detach, collapse_reg_entropy, collapse_reg_entropy_v2, SAFE_Entropy_loss, SAFE_Entropy_loss_v2, SAFE_Entropy_loss_detach, SAFE_Entropy_loss_detach_v2
+
+### dataset
+dataset: &dataset aime24_formatted # gsm8k_test_formatted, gsm8k_test_add_suffix, math_500, college_math_formatted, aime24_formatted, aime25_formatted, minerva_formatted, olympiad_formatted
+eval_dataset: *dataset
+# template: llama2
+# template: qwen
+template: llama3
+# template: qwen3
+# template: phi4
+cutoff_len: 1024
+max_samples: 41000
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+
+output_dir: saves/guohao_exp/Llama-3.1-8B-Instruct/atent/aime24_formatted/lr_2.5e-5-pred_lr_2.5e-5-8_tokens-seed_42
+
+logging_steps: 10
+# save_steps: 4000
+save_strategy: "no"
+plot_loss: true
+overwrite_output_dir: true
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 1
+# learning_rate: 5.0e-5
+learning_rate: &lr 2.5e-5
+# learning_rate: &lr 1.25e-5
+# learning_rate: &lr 1.5e-5
+# learning_rate: 1.75e-5
+# learning_rate: 2.0e-5
+# learning_rate: 2.25e-5
+# learning_rate: 2.75e-5
+# learning_rate: 3.0e-5
+# learning_rate: 1.0e-6
+
+# learning_rate: &lr 5.0e-6
+# learning_rate: &lr 1.0e-5
+# learning_rate: 7.5e-6
+# learning_rate: 2.5e-6
+# learning_rate: 1.0e-7
+
+predictor_learning_rate: *lr
+num_train_epochs: 1.0
+# num_train_epochs: 2.0
+lr_scheduler_type: constant
+warmup_ratio: 0.0
+bf16: true
+ddp_timeout: 180000000
+
+
+### eval
+do_eval: null
+
+### predict
+temperature: 0.0
+do_sample: false
+max_new_tokens: 8192  # 之前是1024，现在统一设成8192
+per_device_eval_batch_size: 1
+predict_with_generate: true
+
+# report_to: tensorboard
+# logging_dir: tensorboard/runs-0327
+report_to: none
