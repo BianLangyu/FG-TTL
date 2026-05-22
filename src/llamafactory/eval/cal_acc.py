@@ -5,9 +5,7 @@ from typing import List, Union, Dict
 import os
 
 def get_acc(source: Union[str, Dict[str, List]], dataset_type: str = "", predict_key: str = "predict", label_key: str = "label", verbose=False) -> float:
-    """传入模型生成结果的文件路径或数据字典，返回准确率"""
-    # assert dataset_type in ["gsm8k1", "gsm8k2", "math_500", "mawps", "college_math", "aime"], f"Unknown dataset_type: {dataset_type}"
-    
+
     all_results = []
     preds = []
     labels = []
@@ -15,9 +13,8 @@ def get_acc(source: Union[str, Dict[str, List]], dataset_type: str = "", predict
         if not dataset_type:
             dataset_type = get_dataset_type(path=source)
         print(f"use dataset_type: {dataset_type}")
-        # 读文件，收集数据
         if dataset_type == "olympiad":
-            preds, labels = get_olympiad_completion_answer_list(source, "/hujinwu/bly/OD-TTL/data/LLMTTA/OlympiadBench/OE_TO_maths_physics_en_COMP.json")
+            preds, labels = get_olympiad_completion_answer_list(source, "eval/OE_TO_maths_physics_en_COMP.json")
         else:
             with open(source, 'r', encoding='utf-8') as f:
                 lines = f.readlines()[:]
@@ -34,13 +31,11 @@ def get_acc(source: Union[str, Dict[str, List]], dataset_type: str = "", predict
         raise ValueError(f"Unknown type of source: {type(source)}")
 
     assert preds and labels and len(preds) == len(preds)
-    # 计算准确率
     all_results = auto_verify(preds, labels, dataset_type, verbose=verbose)
     acc = sum(all_results) / len(all_results)
     return acc, len(preds)
 
 def get_acc_per_interval(path: str, dataset_type: str = "", interval: int = 8, predict_key: str = "predict", label_key: str = "label", log_to_file: bool = True) -> List[float]:
-    """每隔 interval 个样本就算一次准确率"""
     preds, labels = [], []
 
     if not dataset_type:
@@ -70,13 +65,12 @@ def get_acc_per_interval(path: str, dataset_type: str = "", interval: int = 8, p
         results.append(acc)
 
         if log_to_file:
-            file.write(f"总共 {num_samples} 个样本，准确率为：{acc}\n")
+            file.write(f"total {num_samples} samples, acc: {acc}\n")
             file.flush()
 
     return results
 
 def get_dataset_type(path: str):
-    """从路径里解析出dataset_type"""
     dataset_type = ""
     if "gsm8k_test_formatted" in path:
         dataset_type = "gsm8k1"
@@ -112,9 +106,5 @@ if __name__ == "__main__":
     for path in paths:
         acc, num_samples = get_acc(source=path, dataset_type="", verbose=False)  
         results.append(acc)
-        print(f"总共 {num_samples} 个样本。准确率为：{acc}")
-
-        # acc_list = get_acc_per_interval(path=path, log_to_file=True)
-        # print(acc_list)
-        # print(f"准确率为：{acc_list[-1]}")
+        print(f"total {num_samples} samples, acc: {acc}")
     

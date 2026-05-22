@@ -220,9 +220,7 @@ def is_equiv(str1, str2, verbose=False):
         return str1 == str2
     
 def extract_gsm8k_answer_number(completion, flag=0):
-    # 1. 按照空格和换行符分割字符串
     tokens = re.split(r'[\s\n\n]+', completion)
-    # 2. 过滤掉不包含数字的单词(支持负数)
     if flag == 0:
         tokens_with_numbers = [token for token in tokens if re.search(r'-?\d', token) and not re.search(r'\d-[a-zA-Z]', token)]
     elif flag == 1:
@@ -230,7 +228,6 @@ def extract_gsm8k_answer_number(completion, flag=0):
     else:
         tokens_with_numbers = [token for token in tokens if re.search(r'-?\d', token)]
     # tokens_with_numbers = [token for token in tokens if re.search(r'-?\d', token)]
-    # 3. 去除与数字无关的符号（保留逗号和小数点）
     cleaned_numbers = [re.sub(r'[^\d,\.-]', '', token) for token in tokens_with_numbers]
     
     if cleaned_numbers:
@@ -248,7 +245,7 @@ def extract_gsm8k_answer_number(completion, flag=0):
 
 def extract_answer_between_boxed(completion, use_last_number=False):
     extract_ans = None
-    extract_ans = remove_boxed(last_boxed_only_string(completion))  # 提取boxed里的内容
+    extract_ans = remove_boxed(last_boxed_only_string(completion)) 
     if not extract_ans and use_last_number:   # use the last number
         pattern = "-?\d*\.?\d+"
         pred = re.findall(pattern, completion.replace(",", ""))
@@ -278,25 +275,23 @@ def process_minerva_results(completion, answer, use_last_number=False, verbose=F
         return is_equiv(extract_ans, answer)
 import math
 def normalize_scientific_str(s):
-        # Step 1: 统一转换成 Python 可以识别的科学记数法
         s = re.sub(r'\s*\\times\s*10\^\{([^}]*)\}', lambda m: f'e{m.group(1)}', s)  # LaTeX \times 10^{...} -> e...
-        s = re.sub(r'\s*x\s*10\^', 'e', s)  # x10^ -> e
-        s = re.sub(r'([0-9])\s*x\s*', r'\1e', s)  # 1.1 x 10^... -> 1.1e...
-        s = s.replace('^', '**')  # 替换幂符号
+        s = re.sub(r'\s*x\s*10\^', 'e', s) 
+        s = re.sub(r'([0-9])\s*x\s*', r'\1e', s)
+        s = s.replace('^', '**') 
 
-        # Step 2: 解析为浮点数
+
         try:
-            value = float(eval(s))  # 将字符串表达式转为浮点数
+            value = float(eval(s)) 
         except Exception:
             raise ValueError(f"无法解析字符串: {s}")
 
-        # Step 3: 转换为保留一位小数的科学记数法字符串
+
         if value == 0:
             return "0"
         exponent = int(math.floor(math.log10(abs(value))))
         mantissa = round(value / (10 ** exponent), 1)
-        
-        # 处理特殊情况：1.0 -> 不要 .0
+
         if mantissa == int(mantissa):
             mantissa = int(mantissa)
 
@@ -304,7 +299,6 @@ def normalize_scientific_str(s):
 
 def process_math_aime_results(completion, answer, use_last_number=False, verbose=False):
     extract_ans = extract_answer_between_boxed(completion, use_last_number=use_last_number)
-    # answer = answer.strip("<think>\n\n</think>").strip("\n")
     answer = answer.replace("<think>\n\n</think>", "").strip("\n")
     if is_equiv(extract_ans, answer, verbose=verbose):
         return True
@@ -314,23 +308,21 @@ def process_math_aime_results(completion, answer, use_last_number=False, verbose
 
 def fraction_to_decimal(fraction_str):
     """将\\frac{x}{frac}转成相应的小数"""
-    # 使用正则表达式匹配 \frac{分子}{分母} 格式
     match = re.match(r'\\frac\{(\d+)\}\{(\d+)\}', fraction_str)
     if not match:
-        return None  # 如果格式不匹配，返回 None
-    numerator = int(match.group(1))  # 提取分子
-    denominator = int(match.group(2))  # 提取分母
+        return None
+    numerator = int(match.group(1))
+    denominator = int(match.group(2)) 
     
     try:
-        # 计算小数
         result = numerator / denominator
         return result
     except ZeroDivisionError:
-        return None  # 分母为 0，返回 None
+        return None  
 
 def strip_mawps_text(text: str):
     
-    text_idx = text.find("text")   # 去掉单位，如\text{ gallons}
+    text_idx = text.find("text")  
     text = text[:text_idx] if text_idx > 0 else text
 
     text = text.replace("pm", "")
@@ -343,7 +335,6 @@ def strip_mawps_text(text: str):
     
 
 def process_mawps_results(completion, answer, use_last_number=False, verbose=False):   
-    """处理mawps数据集结果。注意数据集需要将提取到的答案转换成float"""
     extract_ans = extract_answer_between_boxed(completion, use_last_number=use_last_number)
     answer = answer.strip("<think>\n\n</think>").strip("\n")
     if "frac" in extract_ans:
@@ -370,7 +361,6 @@ def process_mawps_results(completion, answer, use_last_number=False, verbose=Fal
 
 
 def process_gsm8k_results(completion, answer, use_last_number=False, verbose=False):
-    """非推理模型+GSM8K"""
     extract_ans = extract_gsm8k_answer_number(completion, flag=0)
     if verbose:
             print(extract_ans, answer)
@@ -397,7 +387,6 @@ def process_gsm8k_results_v2(completion, answer, use_last_number=False, verbose=
             if str(round(float(extract_ans.replace(",", "")))) == answer.replace(",", ""):
                 return True
             else:
-                # print(f"预测答案不正确。预测答案：{extract_ans}  标准答案：{answer}")
                 return False
         except:
             return False
@@ -418,9 +407,8 @@ def split_equal(content: str):
         results.append(content.strip())
 
     elif content.count("=") == 1:
-        # 检查等号左边的内容是否存在闭合（左右大/小括号都有），此时要进行分割
         idx = content.find("=")
-        if is_braced(content[:idx]):  # 需要取等号右边的内容
+        if is_braced(content[:idx]): 
             results.append(content.split("=")[-1].strip())
         else:
             results.append(content.strip())
@@ -434,7 +422,7 @@ def split_equal(content: str):
                     results.append(c.split(",")[0])
                 else:
                     results.append(content[idx+1:])
-        else:  # 说明多个等号在字符串中不能分割，整个字符串是个等式
+        else: 
             results.append(content)
     
     return ', '.join(results)
@@ -450,18 +438,16 @@ def strip_text(text: str):
 
 def extract_college_math_ground_truth(answer: str):
     """"提取collegemath数据集样本的标准答案"""
-    if "Therefore" in answer:  # $$\nX_{2}=\\left[\\begin{array}{l}\n0.367 \\\\\n0.4625 \\\\\n0.1705\n\\end{array}\\right]\n$$\n\nTherefore the probability of ending up in location 1 is 0.367.
+    if "Therefore" in answer:  
         temp_ans = answer.split("Therefore")[-1]
         pattern = "-?\d*\.?\d+"
         pred = re.findall(pattern, temp_ans.replace(",", ""))  
         if len(pred) >= 1:
-            extract_ans = pred[-1]  # 提取最后的数字
+            extract_ans = pred[-1]  
             return extract_ans
     
-    # Step 1: 检查是否是奇数个 $，如果是，移除最左边的一个 $
     if answer.count('$') % 2 == 1:
-        answer = answer.replace('$', '', 1)  # 只替换第一个 $
-    # 正则匹配 $...$ 或 $$...$$ 中的内容（非贪婪）
+        answer = answer.replace('$', '', 1) 
     pattern = r'\$(\$?)(.*?)\$\1'
     # pattern = r'\$(.*?)\$|\$\$(.*?)\$\$'
     if match := re.search(pattern, answer, flags=re.DOTALL):
@@ -549,7 +535,6 @@ def process_batch(completion_batch: List[str], answer_batch: List[str], process_
     return true_or_false
 
 def auto_verify(completion_list: List[str], answer_list: List[str], dataset_type: str, verbose: bool = False):
-    # 根据dataset_type确定process_fn
     if dataset_type == "gsm8k1":
         process_fn = process_gsm8k_results
     elif dataset_type == "gsm8k2":
@@ -572,50 +557,3 @@ def auto_verify(completion_list: List[str], answer_list: List[str], dataset_type
     
     return process_batch(completion_list, answer_list, process_fn, verbose)
 
-if __name__ == "__main__":
-    # predict = "To find out how many calls Tim deals with $10 during his 5-day work week, we need -50 to first calculate how many minutes he spends at work each day and then how many minutes he spends at work in a week.\n\n1. First, let's calculate how many minutes Tim spends at work each day. Since he spends 6 hours at work each day, we need to convert this to minutes. There are 60 minutes in an hour, so we multiply 6 hours by 60 minutes per hour.\n\n   6 hours * 60 minutes/hour = 360 minutes\n\n2. Now that we know Tim spends 360 minutes at work each day, we can calculate how many calls he deals with each day. We know it takes him 15 minutes to deal with a call, so we divide the total minutes he spends at work each day by the time it takes to deal with a call.\n\n   360 minutes / 15 minutes/call = 24 calls per day\n\n3. Finally, we need to calculate how many calls Tim deals with during his 5-day work week. We know he deals with 24 calls per day, so we multiply this by the number of days in his work week.\n\n   24 calls/day * 5 days/week = 120 calls per week\n\nTherefore, Tim deals with 120 calls during his 5-day work week."
-    # predict = "Okay, so Josh is trying to flip a house, right? He buys it for $80,000 and then spends another $50,000 on repairs. After that, the value of the house increases by 150%. I need to figure out how much profit he made. Hmm, let me break this down step by step.\n\nFirst, let's figure out the total amount Josh invested in the house. He bought it for $80,000 and then spent $50,000 on repairs. So, adding those together, that's $80,000 + $50,000. Let me write that out:\n\nTotal Investment = Cost of House + Repair Costs\nTotal Investment = $80,000 + $50,000\nTotal Investment = $130,000\n\nOkay, so Josh spent a total of $130,000 on the house. Now, the value of the house increased by 150%. I need to calculate what the new value of the house is after this increase. \n\nWait, increasing by 150% means that the value goes up by 150% of the original price, right? So, the original price here is the price after repairs, which is $130,000. So, 150% of $130,000 is how much? Let me compute that.\n\nFirst, 100% of $130,000 is just $130,000. Then, 50% of $130,000 is half of that, which is $65,000. So, 150% would be 100% + 50%, which is $130,000 + $65,000 = $195,000.\n\nSo, the value of the house increased by $195,000. Therefore, the new value of the house is the original investment plus the increase. Let me write that:\n\nNew Value = Total Investment + Increase\nNew Value = $130,000 + $195,000\nNew Value = $325,000\n\nWait, hold on. Is that right? Because if the value increased by 150%, does that mean it's 150% more than the original, or 150% of the original? Hmm, I think it's 150% of the original. So, 150% of $130,000 is $195,000, so adding that to the original $130,000 gives $325,000. That seems correct.\n\nNow, to find the profit, I need to subtract the total investment from the new value. So, Profit = New Value - Total Investment.\n\nLet me compute that:\n\nProfit = $325,000 - $130,000\nProfit = $200,000\n\nSo, Josh made a profit of $200,000. Hmm, that seems like a lot, but flipping houses can be profitable if everything goes right.\n\nWait, let me double-check my calculations to make sure I didn't make a mistake. \n\nTotal Investment: $80,000 + $50,000 = $130,000. That seems right.\n\n150% increase on $130,000: 150% is 1.5 in decimal. So, 1.5 * 130,000 = 195,000. So, the increase is $195,000. Adding that to the original $130,000 gives $325,000. Then, subtracting the investment gives $200,000 profit. Yeah, that seems consistent.\n\nAlternatively, another way to think about it is that a 150% increase means the new value is 100% + 150% = 250% of the original investment. So, 250% of $130,000 is 2.5 * 130,000 = 325,000. Then, subtracting the original investment gives the profit. Yep, same result.\n\nSo, I think my calculations are correct. Josh made a $200,000 profit by flipping the house.\n\n**Final Answer**\nJosh made a profit of \\boxed{200000} dollars.\n</think>\n\nJosh buys a house for $80,000 and spends $50,000 on repairs. The total investment is calculated as follows:\n\n\\[\n\\text{Total Investment} = \\$80,000 + \\$50,000 = \\$130,000\n\\]\n\nThe value of the house increases by 150%. To find the new value, we calculate 150% of the total investment and add it to the original investment:\n\n\\[\n\\text{Increase} = 1.5 \\times \\$130,000 = \\$195,000\n\\]\n\\[\n\\text{New Value} = \\$130,000 + \\$195,000 = \\$325,000\n\\]\n\nThe profit is the difference between the new value and the total investment:\n\n\\[\n\\text{Profit} = \\$325,000 - \\$130,000 = \\$200,000\n\\]\n\nThus, Josh made a profit of \\boxed{200000} dollars."
-    # predict = "Okay, so Annika went to the town fair with $50. Hmm, that's a good amount for a fair. She spent half of it on food and snacks. Let me figure out how much that is. Half of 50 is... let's see, 50 divided by 2 is 25. So she spent $25 on food and snacks. \n\nNow, after that, she also spent an additional $10 on rides. So I need to subtract that too. Let me add up the total she spent. She spent $25 on food and $10 on rides. That's 25 plus 10, which equals 35. So she spent a total of $35.\n\nWait, let me make sure I did that right. Half of 50 is 25, right? Yeah, because 25 times 2 is 50. Then she spent another 10, so 25 plus 10 is definitely 35. Okay, that seems correct.\n\nNow, to find out how much she has left, I need to subtract the total she spent from the amount she brought. She started with $50 and spent $35. So, 50 minus 35. Let me do that subtraction. 50 minus 30 is 20, and then minus 5 more is 15. So, 50 minus 35 is 15.\n\nWait, is that right? Let me check again. 35 plus 15 is 50, yes. So that makes sense. So she has $15 left after spending on food, snacks, and rides.\n\nI think that's it. She started with 50, spent 25 on food, then 10 on rides, totaling 35, so she has 15 left. Yeah, that seems correct.\n\n**Final Answer**\nThe amount left is \\boxed{15} dollars.\n</think>\n\nAnnika brought $50 to the town fair. She spent half of it on food and snacks, which is calculated as follows:\n\n\\[\n\\frac{50}{2} = 25\n\\]\n\nSo, she spent $25 on food and snacks. Additionally, she spent $10 on rides. The total amount she spent is:\n\n\\[\n25 + 10 = 35\n\\]\n\nTo find out how much she has left, we subtract the total amount spent from the initial amount:\n\n\\[\n50 - 35 = 15\n\\]\n\nThus, the amount left is \\boxed{15} dollars."
-    # extracted_answer = extract_gsm8k_answer_number(predict)
-    # answer = "$\\sum_{n=0}^{\\infty} \\frac{(-1)^{n}}{2 n+1} x^{2 n+1}$"
-    # answer = "Solution is:\n\n$$\n(1-i) \\sqrt{2},-(1+i) \\sqrt{2},-(1-i) \\sqrt{2},(1+i) \\sqrt{2}\n$$"
-    # answer = extract_college_math_ground_truth(answer)
-
-    
-    paths = [
-        "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/base_model_results-hf/minerva_formatted/generated_predictions.jsonl"
-    ]
-
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/base_model_results-hf/minerva_formatted/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_adaptive_k/relative_entropy_as_thres-without_abs/math_500/SAFE_Entropy_loss_detach_v2/lam_0.5-lr_7.5e-6-new_tokens_32-N0_8-K_max_24-K_min_2-initial_delta_0.02-patient_m_2-threshold_low_0.02-coef_0.3-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_tent/math_500/naive_entropy/lr_7.5e-6-all_tokens-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_tent/math_500/dirichlet_entropy/lr_7.5e-6-all_tokens-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    # path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_eata/math_500/naive_entropy/lr_5e-6-all_tokens-threshold_0.4-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    # path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_ttl/math_500/lr_7.5e-6-all_tokens-threshold_3-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/base_model_results-vllm/math_500/math_500-template_llama3-temperature_0.0-max_new_tokens_8192-500samples-generations.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_adaptive_k/relative_entropy_as_thres-without_abs/aime24_formatted/SAFE_Entropy_loss_detach_v2/lr_1.25e-5-new_tokens_32-N0_8-K_max_24-K_min_2-initial_delta_0.02-patient_m_2-threshold_low_0.02-coef_0.3-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_tent/aime24_formatted/naive_entropy/lr_1.25e-5-new_tokens_32-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_tent/aime24_formatted/dirichlet_entropy/lr_1.25e-5-new_tokens_32-seed_42-v2/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_eata/aime24_formatted/naive_entropy/lr_1.25e-5-all_tokens-threshold_0.4-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/online_ttl/aime24_formatted/lr_1.25e-5-all_tokens-threshold_3-seed_42/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
-    path = "/hujinwu/wyf/projects/zhangzitian/projects/LLaMA-Factory-1cfe429/saves/AAAI26/Llama-3.1-8B-Instruct/base_model_results-vllm/aime24_formatted/aime24_formatted-template_llama3-temperature_0.0-max_new_tokens_8192-30samples-generations.jsonl"
-    ress = []
-    preds = []
-    labels = []
-    indices = []
-    with open(path, 'r') as f:
-        lines = f.readlines()
-        for i, line in enumerate(lines[:]):
-            data = eval(line)
-            pred = data["predict"]
-            label = data["label"]
-            preds.append(pred)
-            labels.append(label)
-            res = process_math_aime_results(pred, label, use_last_number=True, verbose=True)
-            # res = process_minerva_results(pred, label, use_last_number=True, verbose=True)
-            if res:
-                indices.append(i+1)
-                ress.append(res)
-            # ress.append(res)
-    print(indices)    
-    print(sum(ress)/len(lines))

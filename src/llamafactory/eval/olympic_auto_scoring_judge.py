@@ -408,10 +408,6 @@ class AutoScoringJudge:
             return True  # Not a power expression, can compute
 
 if __name__ == "__main__":
-    # example_path = "./scoring_examples.json"  # Path to the examples file
-    # with open(example_path, "r", encoding="utf-8") as f:
-    #     examples = json.load(f)
-    
     scorer = AutoScoringJudge()
     
     exp1 = "10^{10^{10^{10}}}"
@@ -421,18 +417,3 @@ if __name__ == "__main__":
     res = scorer.judge(exp1, exp2, precision)
     print(res)
 
-
-    # for exp in examples:
-    #     ground_truth = exp["GT"]
-    #     for exp_ans in exp["Ans"]:
-    #         model_output = exp_ans["answer"]
-
-    #         if "precision" in exp_ans:
-    #             precision = float(exp_ans["precision"]) if type(exp_ans["precision"]) == str else exp_ans["precision"]
-    #         else:
-    #             precision = 1e-8
-                
-    #         result = scorer.judge(ground_truth, model_output, precision)
-
-    #         if result != exp_ans["equal"]:
-    #             print(f"ERROR! Ground_truth: {ground_truth}; Model_output: {model_output}; Expected result: {result}")
