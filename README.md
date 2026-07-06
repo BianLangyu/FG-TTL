@@ -213,5 +213,11 @@ eval/OE_TO_maths_physics_en_COMP.json
 If you find this repository useful, please consider citing our work.
 
 ```bibtex
-
+@inproceedings{bian2026futuregain,
+  title={Future-Gain Guided Test-Time Learning for Large Language Models},
+  author={LangYu Bian and Jinwu Hu and Zitian Zhang and Dongjin Yang and Yufeng Wang and Qing Du and Qi Chen and Mingkui Tan},
+  booktitle={Forty-third International Conference on Machine Learning},
+  year={2026},
+  url={https://openreview.net/forum?id=CEnPJAQTUu}
+}
 ```
