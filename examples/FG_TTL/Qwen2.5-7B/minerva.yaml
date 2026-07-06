@@ -28,7 +28,7 @@ preprocessing_num_workers: 16
 ### output
 
 top_p_2: 0.2
-entropy_threshold: 1.0e-4
+entropy_threshold: 1.0e-5
 gain_softmax_temp: 1.0
 temperature_alpha: 0.5
 

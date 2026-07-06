@@ -33,7 +33,7 @@ gain_softmax_temp: 0.8
 temperature_alpha: 0.5
 
 
-output_dir: saves/Llama3.1-8B/minerva3
+output_dir: saves/Llama3.1-8B/minerva
 
 learning_rate: 7.5e-6
 

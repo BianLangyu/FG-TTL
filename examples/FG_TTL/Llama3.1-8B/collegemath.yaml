@@ -33,7 +33,7 @@ gain_softmax_temp: 0.8
 temperature_alpha: 0.5
 
 
-output_dir: saves/Llama3.1-8B/collegemath2
+output_dir: saves/Llama3.1-8B/collegemath
 
 learning_rate: 1.0e-8
 

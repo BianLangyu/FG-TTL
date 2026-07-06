@@ -32,7 +32,7 @@ gain_softmax_temp: 0.8
 temperature_alpha: 0.5
 
 
-output_dir: saves/Llama3.1-8B/olympiad3
+output_dir: saves/Llama3.1-8B/olympiad
 
 learning_rate: 5.0e-6
 

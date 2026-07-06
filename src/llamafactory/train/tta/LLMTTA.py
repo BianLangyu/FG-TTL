@@ -17,7 +17,7 @@ import json
 import os
 import time
 
-# === 新增导入 ===
+# === Additional imports ===
 from peft import PeftModel, set_peft_model_state_dict
 from safetensors.torch import load_file as safe_load_file
 # ================
@@ -117,12 +117,14 @@ class LLMTTA(nn.Module):
 
     def online_forward_one_lora_all_batch(self, train_batch, predict_batch, step):
         """
-        全程维持一个lora，每次训练完成之后 lora 都被保存到 self.base_output_dir
-        当一个新batch到来，用训练好的模型（此时是peftmodel）进行预测
-        预测完成之后，要恢复成 pretrain_model（即unload），以便正确地加上最新保存的lora继续训练
+        Maintain a single LoRA adapter throughout the process. After each training step,
+        the adapter is saved to self.base_output_dir. For the next incoming batch,
+        use the trained model (as a PEFT model) to make predictions.
+        After prediction, restore the base pretrained model so the newly saved adapter
+        can be correctly applied for the next training iteration.
         """
 
-        self.training_args.output_dir = self.base_output_dir + f'/predict-temperature_{self.generating_args.temperature}-max_new_tokens_{self.generating_args.max_new_tokens}'  # 存放预测结果的文件夹
+        self.training_args.output_dir = self.base_output_dir + f'/predict-temperature_{self.generating_args.temperature}-max_new_tokens_{self.generating_args.max_new_tokens}'  # Directory to store prediction results
 
         # decoder-only models must use left-padding for batched generation.
         if self.training_args.predict_with_generate:
@@ -138,31 +140,32 @@ class LLMTTA(nn.Module):
         
         acc = self.cal_acc_and_record(self.training_args.output_dir + '/generated_predictions.jsonl')
         if acc:
-            print(f"截至 Batch {step}，准确率为: {acc}")
+            print(f"Batch {step} accuracy: {acc}")
         
         self.unwrap_model()
 
         train_batch = self.get_new_train_batch(train_batch, predict_results.predictions)
         
-        self.training_args.output_dir = self.base_output_dir  # 保存 adapter 的文件夹
+        self.training_args.output_dir = self.base_output_dir  # Directory for saving the adapter
         self.tokenizer.padding_side = "right"
 
         self._init_trainer(train_dataset=train_batch)
         self.trainer.train(resume_from_checkpoint=self.training_args.resume_from_checkpoint)
-        self.trainer.save_model()    # 保存模型到 training_args.output_dir
+        self.trainer.save_model()    # Save the model to training_args.output_dir
         
         if self.finetuning_args.add_predictor:
             fix_predictor_checkpoint(self.model, self.training_args.output_dir, self.training_args.save_safetensors)
         self.unwrap_model()
 
-        torch.cuda.empty_cache()  # 清理缓存
+        torch.cuda.empty_cache()  # Clear cache
         # return predict_results
     
     def online_forward_and_record_mem(self, train_batch, predict_batch, step):
         """
-        严格对齐版：保证逻辑顺序、ACC记录、Checkpoint保存与原版完全一致，仅追加时间与显存记录。
+        Strict alignment version: preserve logical order, ACC recording, and checkpoint saving
+        consistent with the reference implementation, while adding timing and memory logs.
         """
-        # ==================== 1. 预测阶段准备 ====================
+        # ==================== 1. Prediction phase setup ====================
         self.training_args.output_dir = self.base_output_dir + f'/predict-temperature_{self.generating_args.temperature}-max_new_tokens_{self.generating_args.max_new_tokens}'
         
         if self.training_args.predict_with_generate:
@@ -172,56 +175,56 @@ class LLMTTA(nn.Module):
         self.training_args.generation_num_beams = self.data_args.eval_num_beams or self.training_args.generation_num_beams
         self.training_args.remove_unused_columns = False
         
-        # --- [计时开始] 全流程 ---
+        # --- [Start timer] full cycle ---
         start_cycle_time = time.time()
 
-        # ==================== 2. 执行预测 ====================
+        # ==================== 2. Run prediction ====================
         self._init_trainer(train_dataset=None)
         predict_results = self.trainer.predict(predict_batch, metric_key_prefix="predict", **self._gen_kwargs)
         self.trainer.save_predictions(predict_batch, predict_results)
         
-        # ==================== 3. 记录准确率====================
+        # ==================== 3. Record accuracy ====================
         acc = self.cal_acc_and_record(self.training_args.output_dir + '/generated_predictions.jsonl')
         if acc:
-            print(f"截至 Batch {step}，准确率为: {acc}")
+            print(f"Batch {step} accuracy: {acc}")
 
-        # 计算生成了多少新 token
+        # Count how many new tokens were generated
         preds = predict_results.predictions
         num_gen_tokens = ((preds != self.tokenizer.pad_token_id) & (preds != -100)).sum().item()
         
         self.unwrap_model()
 
-        # ==================== 4. 数据处理阶段 ====================
+        # ==================== 4. Data processing ====================
         train_batch = self.get_new_train_batch(train_batch, predict_results.predictions)
         
-        # [新增统计] 计算整个 Batch 的总 Token 数
+        # [Additional stats] compute total tokens in this batch
         total_tokens_in_batch = sum(len(ids) for ids in train_batch["input_ids"])
 
-        # ==================== 5. 训练阶段准备 ====================
+        # ==================== 5. Training phase setup ====================
         self.training_args.output_dir = self.base_output_dir
         self.tokenizer.padding_side = "right"
 
-        # 重置并记录初始显存
+        # Reset and record initial memory usage
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.empty_cache()
         memory_after_init = torch.cuda.memory_allocated()
 
         self._init_trainer(train_dataset=train_batch)
         
-        # ==================== 6. 执行训练 ====================
-        # --- [计时开始] 纯训练 ---
+        # ==================== 6. Run training ====================
+        # --- [Start timer] training only ---
         start_train_time = time.time()
         try:
             self.trainer.train(resume_from_checkpoint=self.training_args.resume_from_checkpoint)
         finally:
-            # --- [计时结束] 纯训练 ---
+            # --- [End timer] training only ---
             end_train_time = time.time()
             peak_memory_during_train = torch.cuda.max_memory_allocated()
 
-        # --- [计时结束] 全流程 ---
+        # --- [End timer] full cycle ---
         end_cycle_time = time.time()
 
-        # ==================== 7. 保存模型 ====================
+        # ==================== 7. Save model ====================
         self.trainer.save_model()
         
         if self.finetuning_args.add_predictor:
@@ -230,7 +233,7 @@ class LLMTTA(nn.Module):
         self.unwrap_model()
         torch.cuda.empty_cache()
 
-        # ==================== 8. 指标计算与日志写入 ====================
+        # ==================== 8. Metrics computation and logging ====================
         total_duration = end_cycle_time - start_cycle_time
         train_duration = end_train_time - start_train_time
         overall_throughput = total_tokens_in_batch / total_duration if total_duration > 0 else 0
@@ -240,18 +243,18 @@ class LLMTTA(nn.Module):
 
         log_file = os.path.join(self.base_output_dir, "memory_log.txt")
         with open(log_file, "a", encoding="utf-8") as f:
-            f.write(f"Step {step} 全流程 TTA 报告:\n")
-            f.write(f"  [性能指标]\n")
-            f.write(f"    全流程总耗时: {total_duration:.2f} 秒\n")
-            f.write(f"    纯训练耗时: {train_duration:.2f} 秒\n")
-            f.write(f"    处理总 Token 数: {total_tokens_in_batch} (含生成 {num_gen_tokens} tokens)\n")
-            f.write(f"    整体吞吐量 (Overall Throughput): {overall_throughput:.2f} tokens/s\n")
-            f.write(f"  [资源占用]\n")
-            f.write(f"    峰值显存: {gb(peak_memory_during_train):.2f} GB\n")
-            f.write(f"    额外消耗显存: {gb(peak_memory_during_train - memory_after_init):.2f} GB\n")
+            f.write(f"Step {step} TTA full-cycle report:\n")
+            f.write(f"  [Performance]\n")
+            f.write(f"    Total duration: {total_duration:.2f} seconds\n")
+            f.write(f"    Training duration: {train_duration:.2f} seconds\n")
+            f.write(f"    Total processed tokens: {total_tokens_in_batch} (including {num_gen_tokens} generated tokens)\n")
+            f.write(f"    Overall throughput: {overall_throughput:.2f} tokens/s\n")
+            f.write(f"  [Resource usage]\n")
+            f.write(f"    Peak memory: {gb(peak_memory_during_train):.2f} GB\n")
+            f.write(f"    Extra memory usage: {gb(peak_memory_during_train - memory_after_init):.2f} GB\n")
             f.write("-" * 60 + "\n")
 
-        print(f"[Step {step}] 整体吞吐量: {overall_throughput:.2f} tokens/s | 全流程总耗时: {total_duration:.2f}s | 纯训练耗时: {train_duration:.2f}s")
+        print(f"[Step {step}] Overall throughput: {overall_throughput:.2f} tokens/s | Total duration: {total_duration:.2f}s | Training duration: {train_duration:.2f}s")
 
     def get_new_train_batch(self, train_batch, predictions):
         predictions = torch.from_numpy(predictions)
@@ -278,7 +281,7 @@ class LLMTTA(nn.Module):
                 pure_predictions.append(predictions[i][start_idx:end_idx + 1])
 
         prefix_length = -1
-        # print(f"截取 response 的前 {prefix_length} 个 token")
+        # print(f"Truncate the first {prefix_length} tokens of the response")
         if prefix_length < 0:
             tokens_to_cat = [
                 pure_predictions[idx].tolist() for idx in range(len(pure_predictions))
@@ -304,7 +307,7 @@ class LLMTTA(nn.Module):
 
 
     def cal_acc_and_record(self, path, predict_key="predict", label_key="label"):
-        # 读取预测结果
+        # Read prediction results
         preds = []
         labels = []
         if not os.path.exists(path):
@@ -314,7 +317,7 @@ class LLMTTA(nn.Module):
             lines = f.readlines()
             for line in lines:
                 try:
-                    data = json.loads(line) # 使用json.loads更安全
+                    data = json.loads(line) # use json.loads for safer parsing
                     preds.append(data[predict_key])
                     labels.append(data[label_key])
                 except Exception:
@@ -370,7 +373,7 @@ def run_sft(
     print(f"Train Dataset Size: {len(train_dataset)}")
     num_samples = len(train_dataset)
 
-    # 选择器初始化
+    # Initialize selector
     if finetuning_args.setting != "FG_TTL":
         raise ValueError(
             f"Only setting='FG_TTL' is supported, got: {finetuning_args.setting}"
@@ -396,21 +399,18 @@ def run_sft(
     if len(train_dataset) % batch_size != 0:
         num_of_batch += 1
     
-    # ==================== 断点重续逻辑开始 ====================
+    # ==================== Resume-from-checkpoint logic starts ====================
     start_batch_idx = 0
     
-    # 策略: 读取 generated_predictions.jsonl
-    # 构建预测文件的路径
+    # Strategy: read generated_predictions.jsonl
+    # Build the prediction file path
     pred_dir_name = f"predict-temperature_{generating_args.temperature}-max_new_tokens_{generating_args.max_new_tokens}"
     pred_file_path = os.path.join(training_args.output_dir, pred_dir_name, "generated_predictions.jsonl")
     
     if os.path.exists(pred_file_path):
         try:
-            # 计算已处理的行数
             with open(pred_file_path, "r", encoding="utf-8") as f:
                 processed_samples = sum(1 for _ in f)
-            
-            # 计算对应的 batch index
             calculated_idx = processed_samples // batch_size
             start_batch_idx = calculated_idx
             
@@ -419,18 +419,18 @@ def run_sft(
         except Exception as e:
             logger.warning(f"Failed to count lines in prediction file: {e}.")
 
-    # 加载最新的 Adapter 权重 (如果是断点重续)
+    # Load the latest adapter weights (for resume-from-checkpoint)
     if start_batch_idx > 0:
         adapter_path = training_args.output_dir
         adapter_config_path = os.path.join(adapter_path, "adapter_config.json")
-        # 检查权重文件是否存在
+        # Check whether weight files exist
         has_bin = os.path.exists(os.path.join(adapter_path, "adapter_model.bin"))
         has_safe = os.path.exists(os.path.join(adapter_path, "adapter_model.safetensors"))
         
         if os.path.exists(adapter_config_path) and (has_bin or has_safe):
             logger.info(f"Loading evolved adapter from {adapter_path}...")
             try:
-                # 使用 set_peft_model_state_dict 加载权重
+                # Load weights using set_peft_model_state_dict
                 if has_safe:
                     adapters_weights = safe_load_file(os.path.join(adapter_path, "adapter_model.safetensors"))
                 else:
@@ -440,19 +440,19 @@ def run_sft(
                 logger.info("Successfully loaded evolved adapter weights.")
             except Exception as e:
                 logger.error(f"Failed to load adapter weights: {e}. Training might be compromised.")
-                start_batch_idx = 0 # 如果权重加载失败，可能需要重置
+                start_batch_idx = 0 # Reset if weight loading fails
         else:
             logger.warning(f"Found progress ({start_batch_idx}) but NO ADAPTER WEIGHTS found in {adapter_path}. "
                            "Cannot resume training state (model will be reset to base). "
                            "Starting from batch 0 to ensure consistency.")
             start_batch_idx = 0
-    # ==================== 断点重续逻辑结束 ====================
+    # ==================== Resume-from-checkpoint logic ends ====================
 
     import time
     start = time.time()
 
     for k in range(start_batch_idx, num_of_batch):
-        logger.info(f"正在处理第 {k+1} / {num_of_batch} 批次的数据")
+        logger.info(f"Processing batch {k+1} / {num_of_batch}")
         
         if (k+1)*batch_size > len(train_dataset):
             end_index = len(train_dataset)
@@ -465,5 +465,5 @@ def run_sft(
         llm_tta.forward(sub_trainset, sub_evalset, step=k+1)
 
     end = time.time()
-    logger.info(f"{data_args.dataset}数据集处理完毕，共处理了 {num_samples} 个样本。")
-    logger.info(f"总共耗时: {end - start} 秒。平均每个样本耗时：{(end - start) / num_samples} 秒。")
+    logger.info(f"Dataset {data_args.dataset} processing complete, total samples processed: {num_samples}.")
+    logger.info(f"Total time: {end - start} seconds. Average time per sample: {(end - start) / num_samples} seconds.")
