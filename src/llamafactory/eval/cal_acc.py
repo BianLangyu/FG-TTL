@@ -99,7 +99,7 @@ def get_dataset_type(path: str):
 
 if __name__ == "__main__":
     paths = [
-        "/hujinwu/bly/FG-TTL/saves/Llama3.1-8B/olympiad2/predict-temperature_0.0-max_new_tokens_8192/generated_predictions.jsonl"
+        "path/to/your/result_file.jsonl"  # Replace with your actual result file path
     ]
 
     results = []

@@ -1,5 +1,5 @@
 ### model
-model_name_or_path: /hujinwu/pre-models/Qwen2.5-7B-Instruct
+model_name_or_path: /path/to/Qwen2.5-7B-Instruct
 
 ### method
 stage: sft
